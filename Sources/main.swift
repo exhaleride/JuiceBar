@@ -1,7 +1,7 @@
 import AppKit
 import ServiceManagement
 
-// EmberBar — menu bar power in/out/balance + throttle monitor.
+// JuiceBar — menu bar power in/out/balance + throttle monitor.
 // Data: AppleSmartBattery (IOKit) + private IOReport (SoC power & frequency).
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -23,6 +23,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var plugFlipTime: Date?
     private var menuOpen = false
     private static let settleSeconds: TimeInterval = 35
+
+    // Optional extra bar-title numbers (↓system draw, →time to full/empty).
+    // Off by default; toggled from the dropdown, persisted across launches.
+    private var barDetail = UserDefaults.standard.bool(forKey: "BarDetail")
 
     private var isSettling: Bool {
         guard let t = plugFlipTime else { return false }
@@ -73,7 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         let socSample = soc?.sample(intervalSeconds: max(interval, 0.5)) ?? SocSample()
-        statusItem.button?.attributedTitle = menuBarTitle(power, socSample)
+        statusItem.button?.attributedTitle = menuBarTitle(power, socSample, detailed: barDetail)
 
         // Net counters are sampled every tick (getifaddrs is cheap) so rates
         // are ready the moment the menu opens instead of after one priming tick.
@@ -125,7 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             row("      ├ CPU     \(watts(cpu))")
             row("      ├ GPU     \(watts(gpu))")
             row("      ├ ANE     \(watts(ane))")
-            row("      └ Rest    \(watts(rest))  (display etc.)")
+            row("      └ Rest    \(watts(rest))")
             // Identifiable pieces of Rest drawing real power (> 4 W): measured
             // on-chip meters (memory, media, camera, PCIe) + the display
             // backlight estimate. Quiet consumers stay hidden.
@@ -278,8 +282,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(.separator())
 
-        menu.addItem(NSMenuItem(title: "Quit EmberBar",
+        let toggle = NSMenuItem(title: "Show draw & time in menu bar",
+                                action: #selector(toggleBarDetail), keyEquivalent: "")
+        toggle.target = self
+        toggle.state = barDetail ? .on : .off
+        menu.addItem(toggle)
+
+        menu.addItem(NSMenuItem(title: "Quit JuiceBar",
                                 action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+    }
+
+    @objc private func toggleBarDetail() {
+        barDetail.toggle()
+        UserDefaults.standard.set(barDetail, forKey: "BarDetail")
+        tick()   // refresh the bar title immediately
     }
 
     func menuWillOpen(_ menu: NSMenu) {

@@ -1,4 +1,4 @@
-# EmberBar 🔥
+# JuiceBar 🧃
 
 A tiny native macOS menu bar app that shows your Mac's live **energy balance** —
 what comes in from the wall, what the system burns, and what flows in or out of
@@ -40,7 +40,7 @@ project — one `swiftc` call.
 ./build.sh
 ```
 
-Compiles, ad-hoc signs, installs to `~/Applications/EmberBar.app`, and launches.
+Compiles, ad-hoc signs, installs to `~/Applications/JuiceBar.app`, and launches.
 Registers itself as a login item.
 
 ## How it reads the numbers

@@ -1,9 +1,9 @@
 #!/bin/zsh
-# Build EmberBar.app and install to ~/Applications.
+# Build JuiceBar.app and install to ~/Applications.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP_NAME="EmberBar"
+APP_NAME="JuiceBar"
 BUILD_DIR="build"
 APP="$BUILD_DIR/$APP_NAME.app"
 INSTALL_DIR="$HOME/Applications"
@@ -25,9 +25,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key><string>EmberBar</string>
-    <key>CFBundleIdentifier</key><string>local.nicola.emberbar</string>
-    <key>CFBundleName</key><string>EmberBar</string>
+    <key>CFBundleExecutable</key><string>JuiceBar</string>
+    <key>CFBundleIdentifier</key><string>local.nicola.juicebar</string>
+    <key>CFBundleName</key><string>JuiceBar</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
     <key>CFBundleVersion</key><string>1</string>
     <key>CFBundlePackageType</key><string>APPL</string>

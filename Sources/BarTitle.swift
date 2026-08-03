@@ -1,13 +1,14 @@
 import AppKit
 
-/// The menu bar title, e.g. `91% +15 ⌁78`
+/// The menu bar title, e.g. `91% +15 ⌁78` — or, with `detailed`,
+/// `91% +15 ⌁78 ↓60 →2:03`.
 ///
-/// Deliberately minimal — system draw and time-to-full/empty live in the
-/// dropdown, not the bar:
 ///   91%    battery charge, coloured by state
 ///   +15    net watts into (+) or out of (−) the battery
 ///   ⌁78    watts arriving from the wall  (omitted on battery)
-func menuBarTitle(_ p: PowerSnapshot, _ s: SocSample) -> NSAttributedString {
+///   ↓60    watts the system is drawing        (detailed only)
+///   →2:03  time to full / empty               (detailed only)
+func menuBarTitle(_ p: PowerSnapshot, _ s: SocSample, detailed: Bool) -> NSAttributedString {
     let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
     let title = NSMutableAttributedString()
 
@@ -25,6 +26,14 @@ func menuBarTitle(_ p: PowerSnapshot, _ s: SocSample) -> NSAttributedString {
     }
     if p.externalConnected, let wall = p.wallPowerW {
         parts.append("⌁\(Int(wall.rounded()))")
+    }
+    if detailed {
+        if let sys = p.systemPowerW {
+            parts.append("↓\(Int(sys.rounded()))")
+        }
+        if let mins = p.timeRemainingMin {
+            parts.append(String(format: "→%d:%02d", mins / 60, mins % 60))
+        }
     }
     if Thermal.isElevated || (s.worstFreqRatio ?? 1.0) < 0.80 {
         parts.append("⚠︎")

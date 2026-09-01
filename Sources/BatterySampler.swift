@@ -26,6 +26,21 @@ struct PowerSnapshot {
     var timeRemainingMin: Int?       // to full when charging, to empty when draining
     var batteryTempC: Double?        // Temperature / 100
 
+    /// Charge cap in force (80…95), or nil when charging is unrestricted.
+    /// Filled in by the delegate from ChargeLimit — not read from IOKit.
+    var chargeLimit: Int?
+
+    /// On the charger, sitting at the cap and deliberately not charging.
+    /// Without this, a capped battery looks exactly like a stalled one: macOS
+    /// reports IsCharging = false and the menu bar would go quiet. powerd lets
+    /// the charge drift a few points below the cap before topping it up again,
+    /// so the whole band counts as "held", not just the cap itself.
+    var heldAtLimit: Bool {
+        guard externalConnected, !isCharging,
+              let cap = chargeLimit, let pct = chargePercent else { return false }
+        return pct >= cap - 6
+    }
+
     // OUT (derived): system draw = wall − loss − batteryFlow  (AC)
     //                             = −batteryFlow              (on battery)
     var systemPowerW: Double? {

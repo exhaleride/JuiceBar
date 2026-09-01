@@ -13,7 +13,8 @@ project — one `swiftc` call.
 91% +15 ⌁78
 ```
 
-- `91%` — battery charge (green while charging, orange ≤ 20 %, red < 10 %)
+- `91%` — battery charge (green while charging, **blue while held at the charge
+  limit**, orange ≤ 20 %, red < 10 %)
 - `+15` — net watts into (+) or out of (−) the battery
 - `⌁78` — watts arriving from the wall (hidden on battery)
 - `⚠︎` — appears only when the SoC is genuinely throttling
@@ -33,6 +34,9 @@ project — one `swiftc` call.
 - **TEMPS / FANS** — curated hot spots + an all-sensors submenu, fan RPM
 - **SYS** — display brightness (≈ nits), RAM + memory pressure, swap usage,
   and SSD fill level
+- **CHARGE LIMIT** — cap charging at 80 / 85 / 90 / 95 %, or 100 % for no limit,
+  with a status line saying what the battery is actually doing (`held at 80 %`,
+  `charging to 85 %`, `above 80 % — draining to it`). Replaces AlDente.
 
 ## Install
 
@@ -52,6 +56,30 @@ Registers itself as a login item.
 - Temperatures: HID sensor services; fans: SMC
 - Display brightness: `DisplayServicesGetBrightness` (macOS exposes no live
   measured nits to userspace — nits and backlight watts are estimates)
+- Charge limit: drives **macOS's own limiter** — the same setting as System
+  Settings › Battery › Charge Limit — through the private `PowerUI` framework
+  and the `PowerUIAgent` XPC service. No root, no SMC writes, no privileged
+  helper, no admin password. Needs a Mac that offers Charge Limit (Apple
+  silicon, macOS 26+); elsewhere the section simply doesn't appear.
+
+### Notes on the charge limit
+
+Two things about that API were found by measurement, not documentation:
+
+- `setMCLLimit:` reports success and changes nothing. The setter that works is
+  `temporarilyOverrideMCLTargetSoC:`.
+- The chosen cap is held **in PowerUIAgent's memory only** — nothing lands on
+  disk — so macOS forgets it when that daemon restarts or the Mac reboots.
+  JuiceBar therefore remembers your choice itself and re-applies it on launch
+  and whenever it notices the two have drifted apart.
+
+Because of that, **JuiceBar owns the setting**: change the cap here rather than
+in System Settings, or JuiceBar will put its own value back within a minute. On
+first launch it adopts whatever macOS is already doing, so nothing changes
+until you pick a value.
+
+The old third-party approach — a root helper writing SMC keys `CH0B`/`CH0C`/
+`BCLM` — is dead on this hardware: those keys no longer exist in the SMC.
 
 Private APIs can change between macOS releases; everything degrades gracefully
 (rows disappear rather than showing garbage). Developed and tested on an

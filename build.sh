@@ -16,6 +16,7 @@ swiftc -O \
     Sources/main.swift Sources/BatterySampler.swift \
     Sources/IOReportSampler.swift Sources/Thermal.swift Sources/BarTitle.swift \
     Sources/SMCSampler.swift Sources/HIDTempSampler.swift \
+    Sources/ChargeLimit.swift \
     Sources/DisplaySampler.swift Sources/SystemSampler.swift \
     -framework AppKit -framework IOKit -framework ServiceManagement \
     -o "$APP/Contents/MacOS/$APP_NAME"
@@ -28,13 +29,14 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleExecutable</key><string>JuiceBar</string>
     <key>CFBundleIdentifier</key><string>local.nicola.juicebar</string>
     <key>CFBundleName</key><string>JuiceBar</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleShortVersionString</key><string>1.1</string>
+    <key>CFBundleVersion</key><string>2</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHumanReadableCopyright</key><string>Local build</string>
 </dict>
+</plist>
 PLIST
 
 echo "── signing (ad-hoc)…"

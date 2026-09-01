@@ -28,6 +28,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // Off by default; toggled from the dropdown, persisted across launches.
     private var barDetail = UserDefaults.standard.bool(forKey: "BarDetail")
 
+    // Charge limit. macOS forgets the chosen cap whenever PowerUIAgent restarts
+    // (it is never written to disk), so we keep the choice here and put it back
+    // — see ChargeLimit.swift. nil = the feature is unavailable on this Mac.
+    private var chargeLimit: ChargeLimit?
+    private var limitState: ChargeLimitState?
+    private var limitStateAt = Date.distantPast
+    private var lastLimitError: String?
+    private static let limitRefreshSeconds: TimeInterval = 60
+
     private var isSettling: Bool {
         guard let t = plugFlipTime else { return false }
         return Date().timeIntervalSince(t) < Self.settleSeconds
@@ -41,6 +50,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         smc = SMCSampler()
         hidTemps = HIDTempSampler()
         display = DisplaySampler()
+        chargeLimit = ChargeLimit()
+        refreshChargeLimit(force: true)
 
         // Launch at login is a permanent setting for this app, so register it
         // here rather than exposing a toggle. register() is idempotent.
@@ -70,11 +81,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let last = lastPlugState, last != power.externalConnected {
             plugFlipTime = Date()
         }
+        if lastPlugState != power.externalConnected {
+            refreshChargeLimit(force: true)   // plugging in is when the cap starts to matter
+        }
         lastPlugState = power.externalConnected
         if isSettling {
             // Live values (battery V×I, %) stay; stale-derived ones go.
             power.wallPowerW = nil
         }
+
+        if power.externalConnected { refreshChargeLimit() }
+        power.chargeLimit = limitState?.effectiveLimit
 
         let socSample = soc?.sample(intervalSeconds: max(interval, 0.5)) ?? SocSample()
         statusItem.button?.attributedTitle = menuBarTitle(power, socSample, detailed: barDetail)
@@ -280,6 +297,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                        du, dt, Int((du / dt * 100).rounded())))
         }
 
+        // CHARGE LIMIT — hidden entirely on Macs without a manual charge limit.
+        if chargeLimit != nil, let st = limitState {
+            menu.addItem(.separator())
+            row("CHARGE LIMIT   \(limitStatus(p, st))", bold: true)
+            if let err = lastLimitError { row("       ⚠︎ \(err)") }
+            for step in st.available {
+                let item = NSMenuItem(title: step >= 100 ? "100 %  (no limit)" : "\(step) %",
+                                      action: #selector(selectChargeLimit(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = step
+                item.indentationLevel = 1
+                let active = st.enabled ? st.limit : 100
+                item.state = (step == active) ? .on : .off
+                menu.addItem(item)
+            }
+        }
+
         menu.addItem(.separator())
 
         let toggle = NSMenuItem(title: "Show draw & time in menu bar",
@@ -298,8 +332,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         tick()   // refresh the bar title immediately
     }
 
+    // MARK: - Charge limit
+
+    private static let limitKey = "ChargeLimit"
+
+    /// Reads the cap from macOS, and puts our remembered value back if the two
+    /// have drifted apart — which happens whenever PowerUIAgent restarts, since
+    /// the override is never persisted. Cheap (well under a millisecond over
+    /// XPC), but still throttled: forced on launch, menu open, plug events and
+    /// after every click, otherwise once a minute while on the charger.
+    private func refreshChargeLimit(force: Bool = false) {
+        guard let cl = chargeLimit else { return }
+        guard force || Date().timeIntervalSince(limitStateAt) >= Self.limitRefreshSeconds else { return }
+        limitStateAt = Date()
+
+        guard var st = cl.state() else { limitState = nil; return }
+        let defaults = UserDefaults.standard
+
+        guard let desired = defaults.object(forKey: Self.limitKey) as? Int else {
+            // First launch: adopt whatever macOS is already doing rather than
+            // silently changing the user's battery behaviour.
+            defaults.set(st.enabled ? st.limit : 100, forKey: Self.limitKey)
+            limitState = st
+            return
+        }
+
+        let observed = st.enabled ? st.limit : 100
+        if observed != desired, st.available.contains(desired) {
+            if (try? cl.set(limit: desired)) != nil, let reread = cl.state() { st = reread }
+        }
+        limitState = st
+    }
+
+    private func limitStatus(_ p: PowerSnapshot, _ st: ChargeLimitState) -> String {
+        guard let cap = st.effectiveLimit else { return "off — charges to 100 %" }
+        if !p.externalConnected { return "\(cap) % (on battery)" }
+        if p.isCharging { return "charging to \(cap) %" }
+        if let pct = p.chargePercent, pct > cap { return "above \(cap) % — draining to it" }
+        return "held at \(cap) %"
+    }
+
+    @objc private func selectChargeLimit(_ sender: NSMenuItem) {
+        guard let step = sender.representedObject as? Int, let cl = chargeLimit else { return }
+        do {
+            try cl.set(limit: step)
+            UserDefaults.standard.set(step, forKey: Self.limitKey)
+            lastLimitError = nil
+        } catch {
+            let e = error as NSError
+            lastLimitError = "couldn't set \(step) % (\(e.domain) \(e.code))"
+        }
+        refreshChargeLimit(force: true)
+        tick()
+    }
+
     func menuWillOpen(_ menu: NSMenu) {
         menuOpen = true
+        refreshChargeLimit(force: true)
         tick()
     }
 

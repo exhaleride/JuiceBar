@@ -81,6 +81,14 @@ until you pick a value.
 The old third-party approach — a root helper writing SMC keys `CH0B`/`CH0C`/
 `BCLM` — is dead on this hardware: those keys no longer exist in the SMC.
 
+**Deliberately not built.** AlDente's discharge-to-X, heat protection, calibration
+and sailing modes have no equivalent in Apple's API — there is nothing to call.
+A "charge to 100 % once" button (`temporarilyEnableCharging:`) is one selector
+away and would be genuinely useful, but it was left out of 1.1 because its
+effect is only observable on mains power and the machine was on battery when
+this shipped — an unverified button is worse than a missing one. Verify it
+against `ioreg … IsCharging` before adding it.
+
 Private APIs can change between macOS releases; everything degrades gracefully
 (rows disappear rather than showing garbage). Developed and tested on an
 M1 Pro MacBook Pro running macOS 26.

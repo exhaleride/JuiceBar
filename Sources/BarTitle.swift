@@ -50,13 +50,13 @@ func menuBarTitle(_ p: PowerSnapshot, _ s: SocSample, detailed: Bool) -> NSAttri
     return title
 }
 
-/// Green while charging, blue while held at the charge limit; otherwise
+/// Green while charging, purple while held at the charge limit; otherwise
 /// red < 10 %, orange 10–20 %, neutral above.
 func batteryColour(_ p: PowerSnapshot) -> NSColor {
     if p.isCharging { return .systemGreen }
     // Plugged in and not charging reads as a fault unless you can see it's
-    // on purpose — blue says "the cap is doing this".
-    if p.heldAtLimit { return .systemBlue }
+    // on purpose — purple says "the cap is doing this".
+    if p.heldAtLimit { return .systemPurple }
     if let pct = p.chargePercent {
         if pct < 10 { return .systemRed }
         if pct <= 20 { return .systemOrange }
